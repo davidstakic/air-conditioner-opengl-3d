@@ -1,4 +1,4 @@
-#include "Sphere.h"
+﻿#include "Sphere.h"
 #include <vector>
 #include <cmath>
 #include <glm/gtc/type_ptr.hpp>
@@ -21,13 +21,20 @@ Sphere::Sphere(float radius, int slices, int stacks)
             float U = j / (float)slices;
             float theta = U * (M_PI * 2);
 
-            float x = cos(theta) * sin(phi);
-            float y = cos(phi);
-            float z = sin(theta) * sin(phi);
+            float nx = cos(theta) * sin(phi);
+            float ny = cos(phi);
+            float nz = sin(theta) * sin(phi);
 
-            vertices.push_back(x * radius);
-            vertices.push_back(y * radius);
-            vertices.push_back(z * radius);
+            vertices.push_back(nx * radius);
+            vertices.push_back(ny * radius);
+            vertices.push_back(nz * radius);
+
+            vertices.push_back(U);
+            vertices.push_back(V);
+
+            vertices.push_back(nx);
+            vertices.push_back(ny);
+            vertices.push_back(nz);
         }
     }
 
@@ -46,7 +53,7 @@ Sphere::Sphere(float radius, int slices, int stacks)
         }
     }
 
-    vertexCount = indices.size();
+    vertexCount = (unsigned int)indices.size();
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -60,8 +67,16 @@ Sphere::Sphere(float radius, int slices, int stacks)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    unsigned int stride = 8 * sizeof(float);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
     glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
 }

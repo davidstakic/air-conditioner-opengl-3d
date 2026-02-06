@@ -1,25 +1,25 @@
 #version 330 core
 
 layout(location = 0) in vec3 inPos;
-layout(location = 1) in vec4 inCol;
 layout(location = 2) in vec2 inTex;
+layout(location = 3) in vec3 inNormal;
 
-uniform mat4 uM; // Model
-uniform mat4 uV; // View
-uniform mat4 uP; // Projection
+uniform mat4 uM;
+uniform mat4 uV;
+uniform mat4 uP;
 
-out vec4 channelCol;
+out vec3 FragPos;
+out vec3 Normal;
 out vec2 channelTex;
 
-uniform bool useUniformColor; // nova uniform
+uniform bool useUniformColor;
 
 void main()
 {
-    gl_Position = uP * uV * uM * vec4(inPos, 1.0);
-    if(useUniformColor)
-        channelCol = vec4(0.0); // placeholder, shader ce koristiti uniform
-    else
-        channelCol = inCol;
+    FragPos = vec3(uM * vec4(inPos, 1.0));
+    Normal = mat3(transpose(inverse(uM))) * inNormal;
+
+    gl_Position = uP * uV * vec4(FragPos, 1.0);
 
     channelTex = inTex;
 }

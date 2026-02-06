@@ -9,9 +9,12 @@
 #include "Sphere.h"
 #include "HollowCylinder.h"
 #include "SolidCylinder.h"
+#include "TexturedQuad.h"
+#include "model.hpp"
+#include "shader.hpp"
 
-const double TARGET_FPS = 75.0;
-const double TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
+const float TARGET_FPS = 75.0;
+const float TARGET_FRAME_TIME = 1.0 / TARGET_FPS;
 
 const float lookThreshold = 0.995f;
 const float flapSpeed = 0.0005f;
@@ -41,15 +44,11 @@ float dropY1 = 0.05f;
 float dropY2 = 0.10f;
 float dropY3 = 0.15f;
 
+unsigned signature;
+
 glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 basinOriginalPos;
 glm::vec3 acWorldPos = glm::vec3(0.0f, 0.0f, 0.0f);
-
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if (key == GLFW_KEY_G && action == GLFW_PRESS) useTex = !useTex;
-    if (key == GLFW_KEY_T && action == GLFW_PRESS) transparent = !transparent;
-}
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
@@ -111,6 +110,19 @@ bool lookingAwayFromAC(const glm::vec3& cameraPos)
     return dot < -0.8f;
 }
 
+void preprocessTexture(unsigned& texture, const char* filepath) {
+    texture = loadImageToTexture(filepath);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
 int main()
 {
     if (!glfwInit()) return 1;
@@ -122,7 +134,7 @@ int main()
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
-    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height,  "Air Conditioner 3D", monitor, NULL);
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Air Conditioner 3D", monitor, NULL);
 
     if (!window) return 2;
 
@@ -130,7 +142,6 @@ int main()
     glfwSwapInterval(0);
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwSetKeyCallback(window, keyCallback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
@@ -140,11 +151,15 @@ int main()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    unsigned int shader = createShader("basic.vert", "basic.frag");
-    glUseProgram(shader);
+    Shader shader("basic.vert", "basic.frag");
+    Shader overlayShader("overlay.vert", "overlay.frag");
+
+    TexturedQuad signatureQuad(10.0f, 10.0f, 300.0f, 50.0f);
+    preprocessTexture(signature, "res/signature.png");
 
     Cube airConditioner(0.6f, 0.2f, 0.15);
     Cube flap(0.45f, 0.03f, 0.01f);
+    Cube flapUnder(0.45f, 0.03f, 0.0001f);
     HollowCylinder basin(0.25f, 0.35f, 0.2f, 64);
     glm::vec3 basinPos(0.0f, -0.7f, 0.0f);
     basinOriginalPos = basinPos;
@@ -154,14 +169,15 @@ int main()
     glm::vec3 dropOffset3(-0.05f, 0.0f, -0.05f);
     Sphere lamp(0.03f, 16, 16);
     glm::vec3 lampPos(0.55f, -0.16f, 0.14f);
-                                                                                                                                     
+
+    Model toilet("res/10778_Toilet_V2.obj");
+    Model remote("res/10816_ Remote Control_v2_LOD3.obj");
+                                                                                                                                                                                                                                                            
     glm::mat4 model = glm::mat4(1.0f);
     glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 2.0f);
     glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
-    unsigned int modelLoc = glGetUniformLocation(shader, "uM");
-    unsigned int viewLoc = glGetUniformLocation(shader, "uV");
-    unsigned int projLoc = glGetUniformLocation(shader, "uP");
+    glm::mat4 ortho = glm::ortho(0.0f, (float)mode->width, 0.0f, (float)mode->height);
 
     glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
     glCullFace(GL_BACK);
@@ -169,6 +185,8 @@ int main()
     while (!glfwWindowShouldClose(window))
     {
         double startTime = glfwGetTime();
+
+        glm::vec3 lampWorldPos;
 
         bool spaceNow = glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS;
         spacePressed = spaceNow && !spacePressedLastFrame;
@@ -208,16 +226,60 @@ int main()
         glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         glm::mat4 proj = glm::perspective(glm::radians(fov), (float)mode->width / mode->height, 0.1f, 100.0f);
 
-        glUseProgram(shader);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(proj));
+        shader.use();
+        shader.setMat4("uV", view);
+        shader.setMat4("uP", proj);
+        shader.setVec3("viewPos", cameraPos);
 
-        glUniform1i(glGetUniformLocation(shader, "useTex"), useTex);
-        glUniform1i(glGetUniformLocation(shader, "transparent"), transparent);
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 0);
+        shader.setVec3("lightPos", glm::vec3(1.0f, 2.0f, 2.0f));
+        shader.setVec3("lightColor", glm::vec3(1.0f));
+        shader.setFloat("lightStrength", 1.0f);
 
+        lampWorldPos = glm::vec3(model * glm::vec4(lampPos, 1.0f));
+        shader.setBool("lampOn", isOn);
+        shader.setVec3("lampPos", lampWorldPos);
+        shader.setVec3("lampColor", glm::vec3(1.0f, 0.1f, 0.1f));
+        shader.setFloat("lampStrength", 0.5f);
+
+        shader.setMat4("uM", model);
+        shader.setBool("useTex", false);
+        shader.setInt("useUniformColor", 1);
+        shader.setVec4("uColor", 0.95f, 0.95f, 0.95f, 1.0f);
         airConditioner.draw();
+
+        glm::mat4 toiletModel = glm::mat4(1.0f);
+        float toiletScale = 0.05f;
+        toiletModel = glm::scale(toiletModel, glm::vec3(toiletScale));
+        toiletModel = glm::rotate(toiletModel, glm::radians(90.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+        glm::vec3 toiletPos = glm::vec3(0.25f, 0.0f, -1.5f);
+        toiletModel = glm::translate(glm::mat4(1.0f), toiletPos) * toiletModel;
+        shader.setMat4("uM", toiletModel);
+        shader.setInt("useUniformColor", 0);
+        shader.setBool("useTex", true);
+        toilet.Draw(shader);
+
+        if (!basinPicked)
+        {
+            float remoteDistance = 0.5f;
+            glm::vec3 remoteOffset(0.0f, -0.15f, 0.0f);
+
+            glm::vec3 right = glm::normalize(glm::cross(cameraFront, cameraUp));
+
+            glm::vec3 remoteWorldPos = cameraPos + cameraFront * remoteDistance + right * remoteOffset.x + cameraUp * remoteOffset.y;
+
+            glm::mat4 remoteModel = glm::mat4(1.0f);
+            remoteModel = glm::translate(remoteModel, remoteWorldPos);
+
+            remoteModel = glm::rotate(remoteModel, glm::radians(-yaw + 270.0f), glm::vec3(0, 1, 0));
+
+            float remoteScale = 0.03f;
+            remoteModel = glm::scale(remoteModel, glm::vec3(remoteScale));
+
+            shader.setMat4("uM", remoteModel);
+            shader.setInt("useUniformColor", 0);
+            shader.setBool("useTex", true);
+            remote.Draw(shader);
+        }
 
         if (isOn) {
             if (flapOffset < flapMaxOffset) flapOffset += flapSpeed;
@@ -225,14 +287,21 @@ int main()
         else {
             if (flapOffset > 0.0f) flapOffset -= flapSpeed;
         }
-
         glm::vec3 flapPos(0.0f, -0.14f - 0.01f + flapOffset, 0.15f / 2 + 0.05f / 2 + 0.06f);
         glm::mat4 flapModel = model * glm::translate(glm::mat4(1.0f), flapPos);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(flapModel));
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 1);
-        glUniform4f(glGetUniformLocation(shader, "uColor"), 0.3f, 0.3f, 0.3f, 1.0f);
+        shader.setMat4("uM", flapModel);
+        shader.setInt("useUniformColor", 1);
+        shader.setBool("useTex", false);
+        shader.setVec4("uColor", 0.4f, 0.4f, 0.4f, 1.0f);
         flap.draw();
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 0);
+
+        glm::vec3 flapUnderPos(0.0f, -0.14f - 0.01f, 0.15f / 2 + 0.05f / 2 + 0.05f);
+        glm::mat4 flapUnderModel = model * glm::translate(glm::mat4(1.0f), flapUnderPos);
+        shader.setMat4("uM", flapUnderModel);
+        shader.setInt("useUniformColor", 1);
+        shader.setBool("useTex", false);
+        shader.setVec4("uColor", 0.2f, 0.2f, 0.2f, 1.0f);
+        flapUnder.draw();
 
         glm::vec3 finalBasinPos = basinPos;
         if (basinPicked)
@@ -240,47 +309,30 @@ int main()
             finalBasinPos = cameraPos + cameraFront * 0.6f + glm::vec3(0.0f, -0.25f, 0.0f);
         }
         glm::mat4 basinModel = model * glm::translate(glm::mat4(1.0f), finalBasinPos);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(basinModel));
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 1);
-        glUniform4f(glGetUniformLocation(shader, "uColor"), 0.8f, 0.8f, 0.8f, 1.0f);
+        
+        shader.setMat4("uM", basinModel);
+        shader.setVec4("uColor", 1.0f, 1.0f, 0.7f, 1.0f);
         basin.draw();
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 0);
 
         if (isOn && !basinFilled) {
+            shader.setVec4("uColor", 0.2f, 0.6f, 1.0f, 0.6f);
 
             dropY1 -= dropSpeed;
-            if (dropY1 <= basinPos.y + waterHeight)
-                dropY1 = 0.05f;
-
-            glm::vec3 dropPos1(0.0f, dropY1, 0.0f);
-            glm::mat4 dropModel1 =
-                model * glm::translate(glm::mat4(1.0f), dropPos1);
-
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(dropModel1));
-            glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 1);
-            glUniform4f(glGetUniformLocation(shader, "uColor"), 0.2f, 0.6f, 1.0f, 0.6f);
+            if (dropY1 <= basinPos.y + waterHeight) dropY1 = 0.05f;
+            glm::mat4 dropModel1 = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, dropY1, 0.0f));
+            shader.setMat4("uM", dropModel1);
             drop.draw();
 
             dropY2 -= dropSpeed;
-            if (dropY2 <= basinPos.y + waterHeight)
-                dropY2 = 0.10f;
-
-            glm::vec3 dropPos2 = glm::vec3(0.0f, dropY2, 0.0f) + dropOffset2;
-            glm::mat4 dropModel2 =
-                model * glm::translate(glm::mat4(1.0f), dropPos2);
-
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(dropModel2));
+            if (dropY2 <= basinPos.y + waterHeight) dropY2 = 0.10f;
+            glm::mat4 dropModel2 = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, dropY2, 0.0f) + dropOffset2);
+            shader.setMat4("uM", dropModel2);
             drop.draw();
 
             dropY3 -= dropSpeed;
-            if (dropY3 <= basinPos.y + waterHeight)
-                dropY3 = 0.15f;
-
-            glm::vec3 dropPos3 = glm::vec3(0.0f, dropY3, 0.0f) + dropOffset3;
-            glm::mat4 dropModel3 =
-                model * glm::translate(glm::mat4(1.0f), dropPos3);
-
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(dropModel3));
+            if (dropY3 <= basinPos.y + waterHeight) dropY3 = 0.15f;
+            glm::mat4 dropModel3 = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, dropY3, 0.0f) + dropOffset3);
+            shader.setMat4("uM", dropModel3);
             drop.draw();
         }
 
@@ -295,27 +347,31 @@ int main()
             firstMouse = true;
         }
 
-        if (isOn) {
-            basinStartingToFill = true;
-        }
+        if (isOn) basinStartingToFill = true;
 
         glm::vec3 waterPos = finalBasinPos + glm::vec3(0.0f, 0.001f, 0.0f);
         glm::mat4 waterModel = model * glm::translate(glm::mat4(1.0f), waterPos);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(waterModel));
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 1);
-        glUniform4f(glGetUniformLocation(shader, "uColor"), 0.2f, 0.6f, 1.0f, 0.4f);
-        if (basinStartingToFill) water.draw();
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 0);
+        shader.setMat4("uM", waterModel);
+        shader.setVec4("uColor", 0.2f, 0.6f, 1.0f, 0.4f);
+        if (basinStartingToFill) {
+            glDepthMask(GL_FALSE);
+            glm::vec3 waterPos = finalBasinPos + glm::vec3(0.0f, 0.001f, 0.0f);
+            glm::mat4 waterModel = model * glm::translate(glm::mat4(1.0f), waterPos);
+            shader.setMat4("uM", waterModel);
+            shader.setVec4("uColor", 0.2f, 0.6f, 1.0f, 0.4f);
+            water.draw();
+            glDepthMask(GL_TRUE);
+        }
 
         glm::mat4 lampModel = model * glm::translate(glm::mat4(1.0f), lampPos);
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(lampModel));
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 1);
+        shader.setMat4("uM", lampModel);
 
         if (isOn)
-            glUniform4f(glGetUniformLocation(shader, "uColor"), 1.0f, 0.2f, 0.2f, 1.0f);
+            shader.setVec4("uColor", 1.0f, 0.2f, 0.2f, 1.0f);
         else
-            glUniform4f(glGetUniformLocation(shader, "uColor"), 0.5f, 0.0f, 0.0f, 1.0f);
-        glm::vec3 lampWorldPos = glm::vec3(model * glm::vec4(lampPos, 1.0f));
+            shader.setVec4("uColor", 0.5f, 0.0f, 0.0f, 1.0f);
+
+        lampWorldPos = glm::vec3(model * glm::vec4(lampPos, 1.0f));
         glm::vec3 camToLamp = glm::normalize(lampWorldPos - cameraPos);
         float dot = glm::dot(cameraFront, camToLamp);
         bool currentlyLooking = (dot > lookThreshold);
@@ -324,13 +380,11 @@ int main()
         }
         prevLookingAtLamp = currentlyLooking;
         lamp.draw();
-        glUniform1i(glGetUniformLocation(shader, "useUniformColor"), 0);
 
         if (mouseClicked && basinFilled)
         {
             glm::vec3 rayOrigin = cameraPos;
             glm::vec3 rayDir = glm::normalize(cameraFront);
-
             glm::vec3 toLavor = finalBasinPos - rayOrigin;
             float projection = glm::dot(toLavor, rayDir);
 
@@ -338,7 +392,6 @@ int main()
             {
                 glm::vec3 closestPoint = rayOrigin + rayDir * projection;
                 float distance = glm::length(finalBasinPos - closestPoint);
-
                 float lavorRadius = 0.35f;
                 if (distance < lavorRadius)
                 {
@@ -347,16 +400,24 @@ int main()
                     firstMouse = true;
                 }
             }
-
             mouseClicked = false;
         }
 
         while (glfwGetTime() - startTime < TARGET_FRAME_TIME) {}
+
+        overlayShader.use();
+        overlayShader.setMat4("uMVP", ortho);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, signature);
+        overlayShader.setInt("uTexture", 0);
+        overlayShader.setFloat("uOpacity", 0.5f);
+
+        signatureQuad.draw();
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    glDeleteProgram(shader);
     glfwTerminate();
     return 0;
 }

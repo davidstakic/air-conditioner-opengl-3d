@@ -4,38 +4,38 @@ Cube::Cube(float w, float h, float d)
 {
     float vertices[] =
     {
-        -w, -h,  d,   0.9, 0.9, 0.9, 1.0,   0,0,    0,0,1,
-         w, -h,  d,   0.9, 0.9, 0.9, 1.0,   1,0,    0,0,1,
-         w,  h,  d,   0.9, 0.9, 0.9, 1.0,   1,1,    0,0,1,
-        -w,  h,  d,   0.9, 0.9, 0.9, 1.0,   0,1,    0,0,1,
+        -w, -h,  d,   0,0,    0,0,1,
+         w, -h,  d,   1,0,    0,0,1,
+         w,  h,  d,   1,1,    0,0,1,
+        -w,  h,  d,   0,1,    0,0,1,
 
-        -w, -h, -d,   0.8, 0.8, 0.8, 1.0,   0,0,    0,0,-1,
-        -w,  h, -d,   0.8, 0.8, 0.8, 1.0,   0,1,    0,0,-1,
-         w,  h, -d,   0.8, 0.8, 0.8, 1.0,   1,1,    0,0,-1,
-         w, -h, -d,   0.8, 0.8, 0.8, 1.0,   1,0,    0,0,-1,
+        -w, -h, -d,   0,0,    0,0,-1,
+        -w,  h, -d,   0,1,    0,0,-1,
+         w,  h, -d,   1,1,    0,0,-1,
+         w, -h, -d,   1,0,    0,0,-1,
 
-         -w, -h, -d,   0.7, 0.7, 0.7, 1.0,   0,0,   -1,0,0,
-         -w, -h,  d,   0.7, 0.7, 0.7, 1.0,   1,0,   -1,0,0,
-         -w,  h,  d,   0.7, 0.7, 0.7, 1.0,   1,1,   -1,0,0,
-         -w,  h, -d,   0.7, 0.7, 0.7, 1.0,   0,1,   -1,0,0,
+         -w, -h, -d,   0,0,   -1,0,0,
+         -w, -h,  d,   1,0,   -1,0,0,
+         -w,  h,  d,   1,1,   -1,0,0,
+         -w,  h, -d,   0,1,   -1,0,0,
 
-          w, -h, -d,   0.7, 0.7, 0.7, 1.0,   0,0,    1,0,0,
-          w,  h, -d,   0.7, 0.7, 0.7, 1.0,   0,1,    1,0,0,
-          w,  h,  d,   0.7, 0.7, 0.7, 1.0,   1,1,    1,0,0,
-          w, -h,  d,   0.7, 0.7, 0.7, 1.0,   1,0,    1,0,0,
+          w, -h, -d,   0,0,    1,0,0,
+          w,  h, -d,   0,1,    1,0,0,
+          w,  h,  d,   1,1,    1,0,0,
+          w, -h,  d,   1,0,    1,0,0,
 
-          -w,  h,  d,   1.0, 1.0, 1.0, 1.0,   0,0,    0,1,0,
-           w,  h,  d,   1.0, 1.0, 1.0, 1.0,   1,0,    0,1,0,
-           w,  h, -d,   1.0, 1.0, 1.0, 1.0,   1,1,    0,1,0,
-          -w,  h, -d,   1.0, 1.0, 1.0, 1.0,   0,1,    0,1,0,
+          -w,  h,  d,   0,0,    0,1,0,
+           w,  h,  d,   1,0,    0,1,0,
+           w,  h, -d,   1,1,    0,1,0,
+          -w,  h, -d,   0,1,    0,1,0,
 
-          -w, -h,  d,   0.6, 0.6, 0.6, 1.0,   0,0,    0,-1,0,
-          -w, -h, -d,   0.6, 0.6, 0.6, 1.0,   0,1,    0,-1,0,
-           w, -h, -d,   0.6, 0.6, 0.6, 1.0,   1,1,    0,-1,0,
-           w, -h,  d,   0.6, 0.6, 0.6, 1.0,   1,0,    0,-1,0,
+          -w, -h,  d,   0,0,    0,-1,0,
+          -w, -h, -d,   0,1,    0,-1,0,
+           w, -h, -d,   1,1,    0,-1,0,
+           w, -h,  d,   1,0,    0,-1,0,
     };
 
-    unsigned int stride = (3 + 4 + 2 + 3) * sizeof(float);
+    unsigned int stride = (3 + 2 + 3) * sizeof(float);
 
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -47,13 +47,10 @@ Cube::Cube(float w, float h, float d)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(7 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(10 * sizeof(float)));
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(5 * sizeof(float)));
     glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
